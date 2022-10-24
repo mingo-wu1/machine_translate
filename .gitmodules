@@ -2,3 +2,7 @@
 	path = third_part/grpc
 	url = https://github.com/grpc/grpc.git
 	branch = master
+[submodule "third_part/nllb-serve"]
+	path = third_part/nllb-serve
+	url = git@github.com:thammegowda/nllb-serve.git
+	branch = main
