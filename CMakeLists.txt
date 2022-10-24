@@ -27,6 +27,12 @@ add_custom_command(
         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
         "${hw_proto}"
       DEPENDS "${hw_proto}")
+EXECUTE_PROCESS(      
+      COMMAND python3 -m grpc_tools.protoc 
+        --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
+        --python_out "${CMAKE_CURRENT_BINARY_DIR}"
+        --pyi_out "${CMAKE_CURRENT_BINARY_DIR}"
+        -I ../protos ../protos/helloworld.proto)
 # Include generated *.pb.h files
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 # hw_grpc_proto
