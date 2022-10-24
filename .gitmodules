@@ -6,3 +6,7 @@
 	path = third_part/nllb-serve
 	url = git@github.com:thammegowda/nllb-serve.git
 	branch = main
+[submodule "third_part/EasyTrans"]
+	path = third_part/EasyTrans
+	url = git@github.com:mingo-wu1/EasyTrans.git
+	branch = master
