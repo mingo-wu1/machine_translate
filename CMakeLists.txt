@@ -54,8 +54,8 @@ include_directories(include)
 aux_source_directory(src SRC)
 
 # gen bin and target include file
-add_executable(grpc_server ${SRC})
+add_executable(grpc_server src/grpc_server.cpp ${SRC})
 target_link_libraries(grpc_server pthread ${GRPC_SRC})
 
-add_executable(web_server ${SRC})
+add_executable(web_server src/web_server.cpp ${SRC})
 target_link_libraries(web_server pthread ${GRPC_SRC})
