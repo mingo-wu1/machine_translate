@@ -10,3 +10,7 @@
 	path = third_part/EasyTrans
 	url = git@github.com:mingo-wu1/EasyTrans.git
 	branch = master
+[submodule "third_part/websocketpp"]
+	path = third_part/websocketpp
+	url = https://github.com/zaphoyd/websocketpp.git
+	branch = master
