@@ -14,3 +14,7 @@
 	path = third_part/websocketpp
 	url = https://github.com/zaphoyd/websocketpp.git
 	branch = master
+[submodule "third_part/vue-translate"]
+	path = third_part/vue-translate
+	url = git@github.com:azharimm/vue-translate.git
+	branch = master
