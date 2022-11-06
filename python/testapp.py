@@ -22,7 +22,10 @@ from typing import Tuple
 import sys
 
 log.basicConfig(level=log.INFO)
-DEF_MODEL_ID = "facebook/nllb-200-distilled-600M"
+DEF_MODEL_ID = "facebook/nllb-200-distilled-600M" # old path
+
+DEF_MODEL_ID = "./nllb-200-distilled-600M" # new path
+
 DEF_SRC_LNG = 'eng_Latn'
 DEF_TGT_LNG = 'kan_Knda'
 FLOAT_POINTS = 4
