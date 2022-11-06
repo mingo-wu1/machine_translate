@@ -16,5 +16,5 @@
 	branch = master
 [submodule "third_part/vue-translate"]
 	path = third_part/vue-translate
-	url = git@github.com:azharimm/vue-translate.git
+	url = git@github.com:mingo-wu1/vue-translate.git
 	branch = master
