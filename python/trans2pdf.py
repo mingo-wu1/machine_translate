@@ -8,32 +8,32 @@ import fitz
 from concurrent import futures
 import logging
 
-import grpc
-import helloworld_pb2
-import helloworld_pb2_grpc
+# import grpc
+# import helloworld_pb2
+# import helloworld_pb2_grpc
 
 
-class Greeter(helloworld_pb2_grpc.GreeterServicer):
+# class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
-    def SayHello(self, request, context):
-        c = open(file="/media/bzl/DATA3/BZLproject/00_AGV/forcompare/mywebserver/example/ml.pdf", mode="rb+")
-        # file_context = request.name
-        doc = fitz.open(stream=c) # 打开一个pdf文件
-        rotate = int(0) # 设置图片的旋转角度        
-        trans = fitz.Matrix(2.0, 2.0).prerotate(theta=0)
-        # file_context = 
-        # chuli
-        return helloworld_pb2.HelloReply(message='Hello, %s!' % request.name)
+#     def SayHello(self, request, context):
+#         c = open(file="/media/bzl/DATA3/BZLproject/00_AGV/forcompare/mywebserver/example/ml.pdf", mode="rb+")
+#         # file_context = request.name
+#         doc = fitz.open(stream=c) # 打开一个pdf文件
+#         rotate = int(0) # 设置图片的旋转角度        
+#         trans = fitz.Matrix(2.0, 2.0).prerotate(theta=0)
+#         # file_context = 
+#         # chuli
+#         return helloworld_pb2.HelloReply(message='Hello, %s!' % request.name)
 
 
-def serve():
-    port = '50051'
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    helloworld_pb2_grpc.add_GreeterServicer_to_server(Greeter(), server)
-    server.add_insecure_port('[::]:' + port)
-    server.start()
-    print("Server started, listening on " + port)
-    server.wait_for_termination()
+# def serve():
+#     port = '50051'
+#     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+#     helloworld_pb2_grpc.add_GreeterServicer_to_server(Greeter(), server)
+#     server.add_insecure_port('[::]:' + port)
+#     server.start()
+#     print("Server started, listening on " + port)
+#     server.wait_for_termination()
 
 import requests   # pip intasll requests
 import random
@@ -45,9 +45,61 @@ import urllib.request
 import urllib.parse
 import json
 
+def nllb_translate(content):
+    print("check type:", type(content), "  ", str)
+    print("content:", content)
+    # if type(content)is not str:
+    #     return ""
+    import logging as log    
+    import time
+    from flask import Flask, request, send_from_directory, Blueprint    
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer    
+
+    log.basicConfig(level=log.INFO)
+    
+    DEF_MODEL_ID = "./nllb-200-distilled-600M" # new path
+    # DEF_MODEL_ID = "facebook/nllb-200-distilled-600M" # old path
+    
+    model_id = DEF_MODEL_ID
+    src_lang = 'eng_Latn'
+    tgt_lang = 'zho_Hans'
+    sources = ['No Language Left Behind, no language']
+    sources = [content]
+    max_length = 800 # origin 80
+
+    log.info(f"Loading model {model_id} ...")
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+    log.info(f"Loading default tokenizer for {model_id} ...")
+    # tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # src_langs = tokenizer.additional_special_tokens
+    # tgt_langs = src_langs
+
+    def get_tokenizer(src_lang='eng_Latn'):
+        log.info(f"Loading tokenizer for {model_id}; src_lang={src_lang} ...")
+        #tokenizer = AutoTokenizer.from_pretrained(model_id)
+        return AutoTokenizer.from_pretrained(model_id, src_lang=src_lang)
+
+    st = time.time()
+    tokenizer = get_tokenizer(src_lang=src_lang)
+
+    # if not sources:
+    #    return "Please submit 'source' parameter", 400    
+    inputs = tokenizer(sources, return_tensors="pt", padding=True,)
+        
+    translated_tokens = model.generate( # warning: use probobuf, the version is important
+        **inputs, forced_bos_token_id=tokenizer.lang_code_to_id[tgt_lang],
+        max_length = max_length) # max_new_tokens = 8000
+    output = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
+
+    res = dict(source=sources, translation=output,
+               src_lang = src_lang, tgt_lang=tgt_lang,
+               time_taken = round(time.time() - st, 3), time_units='s')
+    print("res:", output)
+    return output[0]
+
 # os.environ.setdefault("DJANGO_SETTINGS_MODULE", "trans2pdf.settings")
 # django.setup()
-def baidu_translate(contest):    
+def youdao_translate(content):    
     '''实现有道翻译的接口'''
     url = 'http://fanyi.youdao.com/translate?smartresult=dict&smartresult=rule&sessionFrom=https://www.baidu.com/link'
     data = {
@@ -71,12 +123,10 @@ def baidu_translate(contest):
     return res
 
 # 百度翻译方法
-def baidu_translate2(content):
+def baidu_translate(content):
     print(content)
-    print("test==")
     if len(content) > 4891:
-        return '输入请不要超过4891个字符！'
-    print("test==2")
+        return '输入请不要超过4891个字符！'    
     salt = str(random.randint(0, 50))
     # 申请网站 http://api.fanyi.baidu.com/api/trans
     appid = '20221026001417491' # 这里写你自己申请的
@@ -88,13 +138,10 @@ def baidu_translate2(content):
             'to': 'zh',
             'appid': f'{appid }',
             'salt': f'{salt}',
-            'sign': f'{sign}'}
-    print("test==3")
-    j = requests.get('http://api.fanyi.baidu.com/api/trans/vip/translate', head)
-    print("test==4")
+            'sign': f'{sign}'}    
+    j = requests.get('http://api.fanyi.baidu.com/api/trans/vip/translate', head)    
     print(j.json())
-    res = j.json()['trans_result'][0]['dst']
-    print("test==5")
+    res = j.json()['trans_result'][0]['dst']    
     res = re.compile('[\\x00-\\x08\\x0b-\\x0c\\x0e-\\x1f]').sub(' ', res)
     print(res)
     return res
@@ -108,7 +155,7 @@ def is_figure(target):
     return re.match(r'fig\..\.', target, re.I)
 
 if __name__ == '__main__':
-    c = open(file="/media/bzl/DATA3/BZLproject/00_AGV/forcompare/mywebserver/example/ml.pdf", mode="rb+")
+    c = open(file="docs/test.pdf", mode="rb+")
     # file_context = request.name
     print(type(c))
     file_name = "test.pdf"
@@ -220,7 +267,7 @@ if __name__ == '__main__':
                         if reference_flag == 1:
                             print("===test9")
                             trans_pragraph = blocks[num][4].replace("\n", " ")
-                            res = baidu_translate(trans_pragraph).replace(' ', '')
+                            res = nllb_translate(trans_pragraph).replace(' ', '')
                             new_page.insert_textbox(r, res, fontname="song", fontfile=os.path.join('SimSun.ttf'),
                                                    fontsize=7, align=text_pos)  #
                         # 其它情况
@@ -237,7 +284,7 @@ if __name__ == '__main__':
                         if flag == 1:
                             print("===test11")
                             # img.drawRect(fitz.Rect(end[0],begin[1],end[2],end[3]))
-                            res = baidu_translate(content).replace(' ', '')  # 翻译结果去掉汉字中的空格
+                            res = nllb_translate(content).replace(' ', '')  # 翻译结果去掉汉字中的空格
                             new_docx.add_paragraph(res)  # 添加到新的docx文档中
                             # print('content:',content)
                             # print(res)
@@ -256,8 +303,7 @@ if __name__ == '__main__':
                             # img.drawRect(r)
                             trans_pragraph = blocks[num][4].replace("\n", " ")  # 将待翻译的句子换行换成空格
                             if is_figure(trans_pragraph.replace(' ','')):  # 将该块的判断是否是图片标注
-                                res = baidu_translate(trans_pragraph).replace(' ', '')  # 翻译结果去掉汉字中的空格
-                                print("res", res)
+                                res = nllb_translate(trans_pragraph).replace(' ', '')  # 翻译结果去掉汉字中的空格
                                 new_page.insert_textbox(r, res, fontname="song", fontfile=os.path.join('SimSun.ttf'),
                                                     fontsize=7, align=fitz.TEXT_ALIGN_CENTER)
                             # 标记在这里之后的都是参考文献
@@ -267,10 +313,9 @@ if __name__ == '__main__':
                                 new_page.insert_textbox(r, '参考文献', fontname="song", fontfile=os.path.join('SimSun.ttf'),
                                                     fontsize=fonts, align=text_pos)
                             else:
-                                print("===test14=====")
+                                print("===test14=====:", type(trans_pragraph))
                                 # 翻译结果去掉汉字中的空格
-                                res = baidu_translate(trans_pragraph).replace(' ', '')
-                                print("res:", res)
+                                res = nllb_translate(trans_pragraph).replace(' ', '')
                                 # 添加到新的docx文档中
                                 new_docx.add_paragraph(res)
                                 if reference_flag == 1:

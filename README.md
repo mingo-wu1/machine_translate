@@ -1,6 +1,22 @@
 # machine_translate
 machine translate
 
+# 编译工程
+```
+mkdir build && cd build && cmake ..
+```
+
+# 编译grpc
+```
+git submodule update --init
+mkdir build && cd build && cmake ..
+make package
+bash c-ares-1.17.2-Linux.sh # all yes
+cp -r c-ares-1.17.2-Linux/c-ares-1.17.2-Linux <your path>
+# CMakeLists.txt中添加 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_part/c-ares-1.17.2-Linux) # 安装路径前缀
+python3 -m pip grpcio-tools
+```
+
 # init uni-app
 ```
 node -v # 14.20.0

@@ -9,6 +9,11 @@ set(CMAKE_CXX_STANDARD 14)
 # find package
 find_package(websocketpp REQUIRED)
 
+# set grpc cmake profix path
+#find_package(Protobuf REQUIRED)
+#CMAKE_PREFIX_PATH是一个分号分隔的路径列表，用来指明软件/库安装路径前缀，以供find_package()，find_program()，find_library()，find_file()和find_path()命令搜索使用，这样就方便搜索可执行文件、头文件、库文件及相关配置文件等。
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_part/c-ares-1.17.2-Linux) # 安装路径前缀
+
 # Proto file
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/common.cmake)
 get_filename_component(hw_proto "${CMAKE_CURRENT_SOURCE_DIR}/protos/helloworld.proto" ABSOLUTE)
@@ -54,8 +59,8 @@ include_directories(include)
 aux_source_directory(src SRC)
 
 # gen bin and target include file
-add_executable(grpc_server src/grpc_server.cpp ${SRC})
+add_executable(grpc_server grpc_server.cpp ${SRC})
 target_link_libraries(grpc_server pthread ${GRPC_SRC})
 
-add_executable(web_server src/web_server.cpp ${SRC})
+add_executable(web_server web_server.cpp ${SRC})
 target_link_libraries(web_server pthread ${GRPC_SRC})
