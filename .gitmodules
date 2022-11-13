@@ -18,3 +18,7 @@
 	path = third_part/vue-translate
 	url = git@github.com:mingo-wu1/vue-translate.git
 	branch = master
+[submodule "third_part/pdf2docx"]
+	path = third_part/pdf2docx
+	url = git@github.com:dothinking/pdf2docx.git
+	branch = master

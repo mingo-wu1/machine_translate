@@ -44,16 +44,25 @@ import time
 import urllib.request
 import urllib.parse
 import json
+import logging as log    
+import time
+from flask import Flask, request, send_from_directory, Blueprint    
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model_id = "./nllb-200-distilled-600M"
+model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+def get_tokenizer(src_lang='eng_Latn'):
+    log.info(f"Loading tokenizer for {model_id}; src_lang={src_lang} ...")
+    #tokenizer = AutoTokenizer.from_pretrained(model_id)
+    return AutoTokenizer.from_pretrained(model_id, src_lang=src_lang)
+src_lang = 'eng_Latn'
+tokenizer = get_tokenizer(src_lang=src_lang)
 
 def nllb_translate(content):
     print("check type:", type(content), "  ", str)
     print("content:", content)
     # if type(content)is not str:
-    #     return ""
-    import logging as log    
-    import time
-    from flask import Flask, request, send_from_directory, Blueprint    
-    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer    
+    #     return ""   
 
     log.basicConfig(level=log.INFO)
     
@@ -68,19 +77,12 @@ def nllb_translate(content):
     max_length = 800 # origin 80
 
     log.info(f"Loading model {model_id} ...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
     log.info(f"Loading default tokenizer for {model_id} ...")
     # tokenizer = AutoTokenizer.from_pretrained(model_id)
     # src_langs = tokenizer.additional_special_tokens
     # tgt_langs = src_langs
 
-    def get_tokenizer(src_lang='eng_Latn'):
-        log.info(f"Loading tokenizer for {model_id}; src_lang={src_lang} ...")
-        #tokenizer = AutoTokenizer.from_pretrained(model_id)
-        return AutoTokenizer.from_pretrained(model_id, src_lang=src_lang)
-
-    st = time.time()
-    tokenizer = get_tokenizer(src_lang=src_lang)
+    st = time.time()    
 
     # if not sources:
     #    return "Please submit 'source' parameter", 400    
@@ -141,7 +143,7 @@ def baidu_translate(content):
             'sign': f'{sign}'}    
     j = requests.get('http://api.fanyi.baidu.com/api/trans/vip/translate', head)    
     print(j.json())
-    res = j.json()['trans_result'][0]['dst']    
+    res = j.json()['trans_result'][0]['dst']
     res = re.compile('[\\x00-\\x08\\x0b-\\x0c\\x0e-\\x1f]').sub(' ', res)
     print(res)
     return res
@@ -155,7 +157,7 @@ def is_figure(target):
     return re.match(r'fig\..\.', target, re.I)
 
 if __name__ == '__main__':
-    c = open(file="docs/test.pdf", mode="rb+")
+    c = open(file="docs/ml.pdf", mode="rb+")
     # file_context = request.name
     print(type(c))
     file_name = "test.pdf"

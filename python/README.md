@@ -79,3 +79,28 @@ print(translated_text)
 https://github.com/Z-yq/TensorflowASR
 https://github.com/yeyupiaoling/PPASR
 ```
+
+# pdf转docx库比较
+```
+pdf2docx
+PyMuPDF
+pdfplumber
+pdfminer
+camelot
+PyPDF2	读
+PyMuPDF	读
+pdflib	读
+PDF表格	读
+PDFMiner.six	读
+PDF查询	读
+pdfrw	读，写/创作
+PyFPDF	写/创作
+python-office
+pdfminer3k
+一个是pdfminer3k，一个是python-docx，其中pdfminer3k用来解析pdf提取出文本内容，python-docx用来将解析出的文本内容写入word文档
+```
+
+论文
+```
+https://mp.weixin.qq.com/s?__biz=Mzg2OTEzODA5MA==&mid=2247590131&idx=1&sn=80cc7ea6da5dedf77a69d5d66eae356a&chksm=cea28b36f9d50220c0f97361f63afb041052ce7e1bc5eecf5de7fe0d54e31d3a89b5e74bfc8f&token=1635955199&lang=zh_CN#rd
+```
