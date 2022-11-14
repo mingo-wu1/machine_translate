@@ -118,6 +118,126 @@ Pages.py
 
             raw_page.restore(**settings)
             
+这里是raw_oage
+class RawPageFitz(pdf2docx.page.RawPage.RawPage)
+ |  RawPageFitz(page_engine=None)
+ |  
+ |  A wrapper of ``fitz.Page`` to extract source contents.
+ |  
+ |  Method resolution order:
+ |      RawPageFitz
+ |      pdf2docx.page.RawPage.RawPage
+ |      pdf2docx.page.BasePage.BasePage
+ |      pdf2docx.layout.Layout.Layout
+ |      builtins.object
+ |  
+ |  Methods defined here:
+ |  
+ |  extract_raw_dict(self, **settings)
+ |      Extract source data with page engine. Return a dict with the following structure:
+ |      ```
+ |          {
+ |              "width" : w,
+ |              "height": h,    
+ |              "blocks": [{...}, {...}, ...],
+ |              "shapes" : [{...}, {...}, ...]
+ |          }
+ |      ```
+ |  
+ |  ----------------------------------------------------------------------
+ |  Methods inherited from pdf2docx.page.RawPage.RawPage:
+ |  
+ |  __init__(self, page_engine=None)
+ |      Initialize page layout.
+ |      
+ |      Args:
+ |          page_engine (Object): Source pdf page.
+ |  
+ |  calculate_margin(self, **settings)
+ |      Calculate page margin.
+ |      
+ |      .. note::
+ |          Ensure this method is run right after cleaning up the layout, so the page margin is 
+ |          calculated based on valid layout, and stay constant.
+ |  
+ |  clean_up = inner(*args, **kwargs)
+ |  
+ |  parse_section(self, **settings)
+ |      Detect and create page sections.
+ |      
+ |      .. note::
+ |          - Only two-columns Sections are considered for now.
+ |          - Page margin must be parsed before this step.
+ |  
+ |  process_font(self, fonts: pdf2docx.font.Fonts.Fonts)
+ |      Update font properties, e.g. font name, font line height ratio, of ``TextSpan``.
+ |      
+ |      Args:
+ |          fonts (Fonts): Fonts parsed by ``fonttools``.
+ |  
+ |  restore = inner(*args, **kwargs)
+ |  
+ |  ----------------------------------------------------------------------
+ |  Readonly properties inherited from pdf2docx.page.RawPage.RawPage:
+ |  
+ |  raw_text
+ |      Extracted raw text in current page. Should be run after ``restore()`` data.
+ |  
+ |  text
+ |      All extracted text in this page, with images considered as ``<image>``. 
+ |      Should be run after ``restore()`` data.
+ |  
+ |  ----------------------------------------------------------------------
+ |  Readonly properties inherited from pdf2docx.page.BasePage.BasePage:
+ |  
+ |  bbox
+ |  
+ |  working_bbox
+ |      bbox with margin considered.
+ |  
+ |  ----------------------------------------------------------------------
+ |  Data descriptors inherited from pdf2docx.page.BasePage.BasePage:
+ |  
+ |  __dict__
+ |      dictionary for instance variables (if defined)
+ |  
+ |  __weakref__
+ |      list of weak references to the object (if defined)
+ |  
+ |  ----------------------------------------------------------------------
+ |  Methods inherited from pdf2docx.layout.Layout.Layout:
+ |  
+ |  assign_blocks(self, blocks: list)
+ |      Add blocks (line or table block) to this layout. 
+ |      
+ |      Args:
+ |          blocks (list): a list of text line or table block to add.
+ |      
+ |      .. note::
+ |          If a text line is partly contained, it must deep into span -> char.
+ |  
+ |  assign_shapes(self, shapes: list)
+ |      Add shapes to this cell. 
+ |      
+ |      Args:
+ |          shapes (list): a list of Shape instance to add.
+ |  
+ |  contains(self, *args, **kwargs)
+ |      Whether given element is contained in this layout.
+ |  
+ |  parse(self, **settings)
+ |      Parse layout.
+ |      
+ |      Args:
+ |          settings (dict): Layout parsing parameters.
+ |  
+ |  store(self)
+ |      Store parsed layout in dict format.
+(END)
+
+
+
+
 
 这里是raw_page
 lass RawPageFitz(RawPage):
@@ -257,6 +377,6 @@ lass RawPageFitz(RawPage):
                 'uri' : link['uri']
             })
 
-        return hyperlinks
+        return hyperlinks                
 ```
 
