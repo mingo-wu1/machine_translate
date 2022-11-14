@@ -104,3 +104,18 @@ pdfminer3k
 ```
 https://mp.weixin.qq.com/s?__biz=Mzg2OTEzODA5MA==&mid=2247590131&idx=1&sn=80cc7ea6da5dedf77a69d5d66eae356a&chksm=cea28b36f9d50220c0f97361f63afb041052ce7e1bc5eecf5de7fe0d54e31d3a89b5e74bfc8f&token=1635955199&lang=zh_CN#rd
 ```
+文字
+```
+Pages.py
+31行
+        for page in self:
+            if page.skip_parsing: continue
+
+            # init and extract data from PDF
+            raw_page = RawPageFactory.create(page_engine=fitz_doc[page.id], backend='PyMuPDF')
+
+            print(help(raw_page)) # 这里输出文字
+
+            raw_page.restore(**settings)
+```
+
