@@ -379,4 +379,18 @@ lass RawPageFitz(RawPage):
 
         return hyperlinks                
 ```
+table去边框
+```
+Layout.py
+    def parse(self, **settings):
+        '''Parse layout.
 
+        Args:
+            settings (dict): Layout parsing parameters.
+        '''
+        if not self.blocks: return
+
+        # parse tables
+        # self._parse_table(**settings)
+
+```
