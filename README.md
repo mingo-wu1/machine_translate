@@ -60,3 +60,14 @@ translate app vue
 公道-人的时间-短视频完播率
 悬疑-浅入深到结果,连续剧最后是结果,上来给答案话题就废了,不断制作话题,引起疑问,把人性拉爆,把悬疑拉爆
 ```
+
+# 引入c
+```
+extern "C" {
+#include "libavcodec/avcodec.h"
+#include "libavformat/avformat.h"
+#include "libswscale/swscale.h"
+#include "libavformat/avio.h"
+#include "libswscale/version.h"
+}
+```

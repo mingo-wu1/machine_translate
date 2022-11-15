@@ -159,6 +159,82 @@ int web_server() {
     return 0;
 }
 
+extern "C"{
+#include "web_server.h"
+}
+
 int main(int argc, char** argv){
+    ngx_buf_t        *b;
+    ngx_log_t        *log;
+    ngx_uint_t        i;
+    ngx_cycle_t      *cycle, init_cycle;
+    ngx_conf_dump_t  *cd;
+    ngx_core_conf_t  *ccf;
+
+    ngx_debug_init();
+
+    if (ngx_strerror_init() != NGX_OK) {
+        return 1;
+    }
+
+    if (ngx_get_options(argc, argv) != NGX_OK) {
+        return 1;
+    }
+
+    if (ngx_show_version) {
+        ngx_show_version_info();
+
+        if (!ngx_test_config) {
+            return 0;
+        }
+    }
+
+    /* TODO */ ngx_max_sockets = -1;
+
+    ngx_time_init();
+
+#if (NGX_PCRE)
+    ngx_regex_init();
+#endif
+
+    ngx_pid = ngx_getpid();
+    ngx_parent = ngx_getppid();
+
+    log = ngx_log_init(ngx_prefix, ngx_error_log);
+    if (log == NULL) {
+        return 1;
+    }
+
+    /* STUB */
+#if (NGX_OPENSSL)
+    ngx_ssl_init(log);
+#endif
+
+    /*
+     * init_cycle->log is required for signal handlers and
+     * ngx_process_options()
+     */
+
+    ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
+    init_cycle.log = log;
+    ngx_cycle = &init_cycle;
+
+    init_cycle.pool = ngx_create_pool(1024, log);
+    if (init_cycle.pool == NULL) {
+        return 1;
+    }
+
+    if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
+        return 1;
+    }
+
+    if (ngx_process_options(&init_cycle) != NGX_OK) {
+        return 1;
+    }
+
+    if (ngx_os_init(log) != NGX_OK) {
+        return 1;
+    }
+
     web_server();
 }

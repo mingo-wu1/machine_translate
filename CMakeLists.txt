@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.5.1)
 # set the project name and version
 project(web_server VERSION 0.1)
 set(CMAKE_CXX_STANDARD 14)
+cmake_policy(SET CMP0077 NEW)
+set(CMAKE_CXX_FLAGS "-O3 -no-pie -ggdb -Wall \
+  -Wextra -Wcast-align -Wdisabled-optimization -Wformat=2 \
+  -Winit-self -Wmissing-include-dirs -Woverloaded-virtual \
+  -Wshadow -Wsign-promo -fpermissive ") # -Werror
 
 ###############################################
 
@@ -52,6 +57,18 @@ target_link_libraries(hw_grpc_proto
   ${_PROTOBUF_LIBPROTOBUF})
 list(APPEND GRPC_SRC hw_grpc_proto ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF})
 
+# use nginx file
+include_directories(nginx/src/event
+                    nginx/src/core
+                    nginx/src/os/unix
+                    nginx/objs)
+file(GLOB NGINX_SRC nginx/src/core/*.c   # use this aux_source_directory(nginx/src/core NGINX) is ok
+                    nginx/src/event/*.c
+                    nginx/src/os/unix/*.c
+                    nginx/src/event/modules/*.c
+                    nginx/objs/*.c)
+add_library(ng ${NGINX_SRC})
+
 ##############################################
 
 # include file and add source file
@@ -63,4 +80,4 @@ add_executable(grpc_server grpc_server.cpp ${SRC})
 target_link_libraries(grpc_server pthread ${GRPC_SRC})
 
 add_executable(web_server web_server.cpp ${SRC})
-target_link_libraries(web_server pthread ${GRPC_SRC})
+target_link_libraries(web_server pthread ng ${GRPC_SRC})
