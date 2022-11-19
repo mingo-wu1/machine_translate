@@ -71,3 +71,15 @@ extern "C" {
 #include "libswscale/version.h"
 }
 ```
+# nginx 分析
+```
+https://blog.51cto.com/u_15284125/5191796
+https://blog.csdn.net/ddazz0621/article/details/120988507
+https://blog.csdn.net/hz5034/article/details/77367871
+https://www.cnblogs.com/zengkefu/p/5814780.html
+https://blog.csdn.net/initphp/category_9265172.html
+```
+# websocket 分析
+```
+https://www.zhihu.com/question/20215561/answer/40316953
+```
