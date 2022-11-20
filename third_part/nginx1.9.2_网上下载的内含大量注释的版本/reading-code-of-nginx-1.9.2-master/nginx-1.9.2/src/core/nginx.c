@@ -208,9 +208,9 @@ static char **ngx_os_environ;
 int ngx_cdecl
 main(int argc, char *const *argv)
 {
-    ngx_buf_t        *b;
-    ngx_log_t        *log;
-    ngx_uint_t        i;
+    ngx_buf_t        *b; // 链表    
+    ngx_log_t        *log; // 链表    
+    ngx_uint_t        i; // uint
     ngx_cycle_t      *cycle, init_cycle;
     ngx_conf_dump_t  *cd;
     ngx_core_conf_t  *ccf;
