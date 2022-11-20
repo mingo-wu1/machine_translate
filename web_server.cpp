@@ -167,7 +167,6 @@ int main(int argc, char** argv){
     ngx_buf_t        *b;
     ngx_log_t        *log;
     ngx_uint_t        i;
-    ngx_cycle_t      *cycle, init_cycle;
     ngx_conf_dump_t  *cd;
     ngx_core_conf_t  *ccf;
 
@@ -210,31 +209,29 @@ int main(int argc, char** argv){
     ngx_ssl_init(log);
 #endif
 
-    /*
-     * init_cycle->log is required for signal handlers and
-     * ngx_process_options()
-     */
-
-    ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
-    init_cycle.log = log;
-    ngx_cycle = &init_cycle;
-
-    init_cycle.pool = ngx_create_pool(1024, log);
-    if (init_cycle.pool == NULL) {
-        return 1;
-    }
-
-    if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
-        return 1;
-    }
-
-    if (ngx_process_options(&init_cycle) != NGX_OK) {
-        return 1;
-    }
-
     if (ngx_os_init(log) != NGX_OK) {
         return 1;
     }
+
+    /*
+     * ngx_crc32_table_init() requires ngx_cacheline_size set in ngx_os_init()
+     */
+
+    if (ngx_crc32_table_init() != NGX_OK) {
+        return 1;
+    }
+
+    /*
+     * ngx_slab_sizes_init() requires ngx_pagesize set in ngx_os_init()
+     */
+
+    ngx_slab_sizes_init();
+
+    if (ngx_preinit_modules() != NGX_OK) {
+        return 1;
+    }
+
+    ngx_use_stderr = 0;
 
     web_server();
 }
