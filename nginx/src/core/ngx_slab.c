@@ -87,9 +87,9 @@ ngx_slab_sizes_init(void)
 {
     ngx_uint_t  n;
 
-    ngx_slab_max_size = ngx_pagesize / 2;
-    ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t));
-    for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) {
+    ngx_slab_max_size = ngx_pagesize / 2; // ngx_pagesize 4096 (4k) , ngx_slab_max_size 2048 (2k)
+    ngx_slab_exact_size = ngx_pagesize / (8 * sizeof(uintptr_t)); // ngx_slab_exact_size 64 = 4 x 8 x 2
+    for (n = ngx_slab_exact_size; n >>= 1; ngx_slab_exact_shift++) { // ngx_slab_exact_shift 6
         /* void */
     }
 }

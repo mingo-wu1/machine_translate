@@ -321,17 +321,17 @@ ngx_log_init(u_char *prefix, u_char *error_log)
     size_t   nlen, plen;
 
     ngx_log.file = &ngx_log_file;
-    ngx_log.log_level = NGX_LOG_NOTICE;
+    ngx_log.log_level = NGX_LOG_NOTICE; // #define NGX_LOG_NOTICE 6
 
     if (error_log == NULL) {
-        error_log = (u_char *) NGX_ERROR_LOG_PATH;
+        error_log = (u_char *) NGX_ERROR_LOG_PATH; // #define NGX_ERROR_LOG_PATH "logs/error.log"
     }
 
-    name = error_log;
-    nlen = ngx_strlen(name);
+    name = error_log; // name = "logs/error.log"
+    nlen = ngx_strlen(name); // 长度
 
     if (nlen == 0) {
-        ngx_log_file.fd = ngx_stderr;
+        ngx_log_file.fd = ngx_stderr; // std err 标准输出, 控制台
         return &ngx_log;
     }
 
@@ -356,12 +356,12 @@ ngx_log_init(u_char *prefix, u_char *error_log)
         }
 
         if (plen) {
-            name = malloc(plen + nlen + 2);
+            name = malloc(plen + nlen + 2); // 分配内存,  
             if (name == NULL) {
                 return NULL;
             }
 
-            p = ngx_cpymem(name, prefix, plen);
+            p = ngx_cpymem(name, prefix, plen); // 拷贝内容到name ,  "NGX_PREFIX/NGX_ERROR_LOG_PATH"   "/usr/local/nginx/"  "logs/error.log"   name="/usr/local/nginx/logs/error.log"
 
             if (!ngx_path_separator(*(p - 1))) {
                 *p++ = '/';
@@ -369,15 +369,15 @@ ngx_log_init(u_char *prefix, u_char *error_log)
 
             ngx_cpystrn(p, error_log, nlen + 1);
 
-            p = name;
+            p = name; // p = name // name="/usr/local/nginx/logs/error.log"
         }
     }
 
     ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND,
                                     NGX_FILE_CREATE_OR_OPEN,
-                                    NGX_FILE_DEFAULT_ACCESS);
+                                    NGX_FILE_DEFAULT_ACCESS); // 打开文件
 
-    if (ngx_log_file.fd == NGX_INVALID_FILE) {
+    if (ngx_log_file.fd == NGX_INVALID_FILE) { // 如果打开失败
         ngx_log_stderr(ngx_errno,
                        "[alert] could not open error log file: "
                        ngx_open_file_n " \"%s\" failed", name);
@@ -387,7 +387,7 @@ ngx_log_init(u_char *prefix, u_char *error_log)
                        ngx_open_file_n " \"%s\" failed", name);
 #endif
 
-        ngx_log_file.fd = ngx_stderr;
+        ngx_log_file.fd = ngx_stderr; // 如果打开失败,那就使用标准输出std err
     }
 
     if (p) {

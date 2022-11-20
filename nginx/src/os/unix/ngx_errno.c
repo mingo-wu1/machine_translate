@@ -150,10 +150,10 @@ ngx_strerror_init(void)
     ngx_first_error = 0;
 
     for (err = 0; err < 1000; err++) {
-        ngx_set_errno(0);
-        msg = strerror(err);
+        ngx_set_errno(0); // #define ngx_set_errno(err)         errno = err  , errno 是记录系统的最后一次错误代码。代码是一个int型的值，在errno.h中定义
+        msg = strerror(err); // 返回系统错误字符串extern char *strerror (int __errnum) __THROW; 宏定义{0 : "No error", 1 : "Operation not permitted",} // #define EPERM 1 /* Operation not permitted */
 
-        if (errno == EINVAL
+        if (errno == EINVAL //22=EINVAL表示 无效的参数，即为 invalid argument ，包括参数值、类型或数目无效等。
             || msg == NULL
             || strncmp(msg, "Unknown error", 13) == 0)
         {
@@ -170,31 +170,31 @@ ngx_strerror_init(void)
      * malloc() is used and possible errors are logged using strerror().
      */
 
-    len = (ngx_last_error - ngx_first_error) * sizeof(ngx_str_t);
+    len = (ngx_last_error - ngx_first_error) * sizeof(ngx_str_t); //typedef struct {size_t len;u_char *data;} ngx_str_t;
 
-    ngx_sys_errlist = malloc(len);
+    ngx_sys_errlist = malloc(len); // static ngx_str_t  *ngx_sys_errlist <==> static ngx_str_t ngx_sys_errlist[lenn]
     if (ngx_sys_errlist == NULL) {
         goto failed;
     }
 
-    for (err = ngx_first_error; err < ngx_last_error; err++) {
-        msg = strerror(err);
+    for (err = ngx_first_error; err < ngx_last_error; err++) { // iter err迭代
+        msg = strerror(err); //返回系统错误字符串
 
         if (msg == NULL) {
             ngx_sys_errlist[err - ngx_first_error] = ngx_unknown_error;
             continue;
         }
 
-        len = ngx_strlen(msg);
+        len = ngx_strlen(msg); // string len of msg ; msg = "xxx"
 
-        p = malloc(len);
+        p = malloc(len); // p  is   u_char     *p; 开辟内存空间
         if (p == NULL) {
             goto failed;
         }
 
-        ngx_memcpy(p, msg, len);
-        ngx_sys_errlist[err - ngx_first_error].len = len;
-        ngx_sys_errlist[err - ngx_first_error].data = p;
+        ngx_memcpy(p, msg, len); // memcpy    p;  msg赋值给p
+        ngx_sys_errlist[err - ngx_first_error].len = len; // 赋值系统errno.h错误p长度, ngx_sys_errlist是结构体数组,typedef struct{size_t len;u_char *data;} ngx_str_t;
+        ngx_sys_errlist[err - ngx_first_error].data = p; // 赋值系统errno.h错误p的值, p = msg
     }
 
     return NGX_OK;

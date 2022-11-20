@@ -35,3 +35,4 @@
 build
 node_modules
 nllb-200-distilled-600M
+.vscode
