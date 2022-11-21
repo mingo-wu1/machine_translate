@@ -36,7 +36,7 @@ static ngx_connection_t  dumb;
 
 
 ngx_cycle_t *
-ngx_init_cycle(ngx_cycle_t *old_cycle)
+ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结构体来控制进程运行的, ngx_init_cycle方法，顾名思义，就是用来构造ngx_cycle_t结构体中成员的
 {
     void                *rv;
     char               **senv;
