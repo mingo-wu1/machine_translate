@@ -58,8 +58,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
     /* force localtime update with a new timezone */
 
-    tp = ngx_timeofday();
-    tp->sec = 0;
+    tp = ngx_timeofday(); //#define ngx_timeofday() (ngx_time_t *)ngx_cached_time ;  typedef struct {time_t sec;ngx_uint_t msec;ngx_int_t gmtoff;} ngx_time_t;
+    tp->sec = 0; // 所以这里 tp 是 ngx_time_t* 类型
 
     ngx_time_update();
 
