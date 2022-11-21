@@ -54,50 +54,50 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     ngx_core_module_t   *module;
     char                 hostname[NGX_MAXHOSTNAMELEN];
 
-    ngx_timezone_update();
+    ngx_timezone_update(); /* 更新时区 */
 
     /* force localtime update with a new timezone */
 
     tp = ngx_timeofday(); //#define ngx_timeofday() (ngx_time_t *)ngx_cached_time ;  typedef struct {time_t sec;ngx_uint_t msec;ngx_int_t gmtoff;} ngx_time_t;
     tp->sec = 0; // 所以这里 tp 是 ngx_time_t* 类型
 
-    ngx_time_update();
+    ngx_time_update(); /* 更新缓存时间, 注意这是主程序常用接口 */
 
 
     log = old_cycle->log;
 
-    pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
+    pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log); /* 为 ngx_cycle_t 创建一个 16k 大小内存池 */
     if (pool == NULL) {
         return NULL;
     }
     pool->log = log;
 
-    cycle = ngx_pcalloc(pool, sizeof(ngx_cycle_t));
+    cycle = ngx_pcalloc(pool, sizeof(ngx_cycle_t)); /* 为 ngx_cycle_t 分配内存 */
     if (cycle == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
-    cycle->pool = pool;
+    cycle->pool = pool; /* 设置 ngx_cycle_t 使用的内存池 */
     cycle->log = log;
-    cycle->old_cycle = old_cycle;
+    cycle->old_cycle = old_cycle; /* old_cycle 一般仅用来传递 ngx_cycle_t 结构体中的配置文件路径等参数. */
 
-    cycle->conf_prefix.len = old_cycle->conf_prefix.len;
-    cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix);
+    cycle->conf_prefix.len = old_cycle->conf_prefix.len; /* 假设设置 --prefix=/usr/local/nginx */
+    cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix); /* Nginx 配置文件所在目录的路径: /usr/local/nginx/conf/ */
     if (cycle->conf_prefix.data == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
     cycle->prefix.len = old_cycle->prefix.len;
-    cycle->prefix.data = ngx_pstrdup(pool, &old_cycle->prefix);
+    cycle->prefix.data = ngx_pstrdup(pool, &old_cycle->prefix); /* Nginx 安装目录的路径: /usr/local/nginx/ */
     if (cycle->prefix.data == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
     cycle->error_log.len = old_cycle->error_log.len;
-    cycle->error_log.data = ngx_pnalloc(pool, old_cycle->error_log.len + 1);
+    cycle->error_log.data = ngx_pnalloc(pool, old_cycle->error_log.len + 1); // 配置 error_log 路径
     if (cycle->error_log.data == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
@@ -106,7 +106,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
                 old_cycle->error_log.len + 1);
 
     cycle->conf_file.len = old_cycle->conf_file.len;
-    cycle->conf_file.data = ngx_pnalloc(pool, old_cycle->conf_file.len + 1);
+    cycle->conf_file.data = ngx_pnalloc(pool, old_cycle->conf_file.len + 1);  /* 配置文件相对于安装目录的路径名称: /usr/local/nginx/conf/nginx.conf */
     if (cycle->conf_file.data == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
@@ -114,7 +114,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     ngx_cpystrn(cycle->conf_file.data, old_cycle->conf_file.data,
                 old_cycle->conf_file.len + 1);
 
-    cycle->conf_param.len = old_cycle->conf_param.len;
+    cycle->conf_param.len = old_cycle->conf_param.len; /* Nginx 处理配置文件时需要特殊处理的在命令行携带的参数，一般是 -g 选项所携带的参数 */
     cycle->conf_param.data = ngx_pstrdup(pool, &old_cycle->conf_param);
     if (cycle->conf_param.data == NULL) {
         ngx_destroy_pool(pool);
@@ -122,16 +122,16 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     }
 
 
-    n = old_cycle->paths.nelts ? old_cycle->paths.nelts : 10;
+    n = old_cycle->paths.nelts ? old_cycle->paths.nelts : 10; //动态数组容器，它保存着 Nginx 所有要操作的目录。如果有目录不能存在，则会试图创建，而创建目录失败将会导致 Nginx 启动失败。如，上传文件的临时目录也在 pathes 中，如果没有权限创建，则会导致 Nginx 无法启动. 这里，若 old->cycle->paths 中没有元素，则默认为 10
 
-    if (ngx_array_init(&cycle->paths, pool, n, sizeof(ngx_path_t *))
+    if (ngx_array_init(&cycle->paths, pool, n, sizeof(ngx_path_t *)) /* 创建 cycle->paths 数组 */
         != NGX_OK)
     {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
-    ngx_memzero(cycle->paths.elts, n * sizeof(ngx_path_t *));
+    ngx_memzero(cycle->paths.elts, n * sizeof(ngx_path_t *)); // 初始化 0
 
 
     if (ngx_array_init(&cycle->config_dump, pool, 1, sizeof(ngx_conf_dump_t))
@@ -141,7 +141,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
         return NULL;
     }
 
-    ngx_rbtree_init(&cycle->config_dump_rbtree, &cycle->config_dump_sentinel,
+    ngx_rbtree_init(&cycle->config_dump_rbtree, &cycle->config_dump_sentinel, /* 初始化一棵红黑树 config_dump_rbtree */
                     ngx_str_rbtree_insert_value);
 
     if (old_cycle->open_files.part.nelts) {
@@ -150,11 +150,11 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
             n += part->nelts;
         }
 
-    } else {
+    } else { //* 若 old_cycle->open_files 链表为空，则默认设置下面创建的 open_files 链表, 元素个数为 20 */
         n = 20;
     }
 
-    if (ngx_list_init(&cycle->open_files, pool, n, sizeof(ngx_open_file_t))
+    if (ngx_list_init(&cycle->open_files, pool, n, sizeof(ngx_open_file_t)) // 创建 open_files 链表，元素类型是 ngx_open_file_t 结构体，它表示 Nginx 已经打开的所有文件。事实上，Nginx 框架不会向 open_files 链表中添加文件，而是由对此感兴趣的模块向其中添加文件路径名，Nginx框架会在 ngx_init_cycle 方法中打开这些文件
         != NGX_OK)
     {
         ngx_destroy_pool(pool);
@@ -169,7 +169,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
             n += part->nelts;
         }
 
-    } else {
+    } else { // 若 old_cycle->shared_memory 链表为空，则默认下面创建的 shared_memory 链表 元素个数为 1
         n = 1;
     }
 
@@ -182,7 +182,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
 
     n = old_cycle->listening.nelts ? old_cycle->listening.nelts : 10;
 
-    if (ngx_array_init(&cycle->listening, pool, n, sizeof(ngx_listening_t))
+    if (ngx_array_init(&cycle->listening, pool, n, sizeof(ngx_listening_t)) // 创建 listening 数组，每个数组元素存储着 ngx_listening_t 成员，表示监听端口及相关的参数
         != NGX_OK)
     {
         ngx_destroy_pool(pool);
@@ -192,17 +192,17 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     ngx_memzero(cycle->listening.elts, n * sizeof(ngx_listening_t));
 
 
-    ngx_queue_init(&cycle->reusable_connections_queue);
+    ngx_queue_init(&cycle->reusable_connections_queue); // 初始化 reusable_connections_queue 双向链表容器，元素类型是 ngx_connection_t 结构体，表示可重复使用连接队列
 
 
-    cycle->conf_ctx = ngx_pcalloc(pool, ngx_max_module * sizeof(void *));
+    cycle->conf_ctx = ngx_pcalloc(pool, ngx_max_module * sizeof(void *)); // conf_ctx 保存着所有模块存储配置项的结构体的指针，它首先是一个数组，每个数组成员 又是一个指针，这个指针指向另一个存储着指针的数组。该数组的最大值 ngx_max_module 在 ngx_preinit_modules 函数中确定
     if (cycle->conf_ctx == NULL) {
         ngx_destroy_pool(pool);
         return NULL;
     }
 
 
-    if (gethostname(hostname, NGX_MAXHOSTNAMELEN) == -1) {
+    if (gethostname(hostname, NGX_MAXHOSTNAMELEN) == -1) { /* 获取本地主机名 */
         ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "gethostname() failed");
         ngx_destroy_pool(pool);
         return NULL;
@@ -219,29 +219,29 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
         return NULL;
     }
 
-    ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
+    ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len); /* 将获取到的主机名按小写方式保存到 cycle->hostname 中 */
 
 
-    if (ngx_cycle_modules(cycle) != NGX_OK) {
+    if (ngx_cycle_modules(cycle) != NGX_OK) { // 将全局变量 ngx_modules 数组所包含的所有模块都复制到 cycle->modules 中 该 modules 数组的元素个数为 cycle->modules_n
         ngx_destroy_pool(pool);
         return NULL;
     }
 
 
-    for (i = 0; cycle->modules[i]; i++) {
+    for (i = 0; cycle->modules[i]; i++) { /* 遍历所有的核心模块 */
         if (cycle->modules[i]->type != NGX_CORE_MODULE) {
             continue;
         }
 
-        module = cycle->modules[i]->ctx;
+        module = cycle->modules[i]->ctx; /* 获取该模块对象的上下文结构体，对于核心模块 其上下文结构体固定为 ngx_core_module_t */
 
-        if (module->create_conf) {
+        if (module->create_conf) { /* 调用核心模块的 create_conf 函数，创建实际的配置信息存储空间  并初始化该配置信息结构体 */
             rv = module->create_conf(cycle);
             if (rv == NULL) {
                 ngx_destroy_pool(pool);
                 return NULL;
             }
-            cycle->conf_ctx[cycle->modules[i]->index] = rv;
+            cycle->conf_ctx[cycle->modules[i]->index] = rv; /* 将返回的配置信息结构体保存到该核心模块在 cycle->conf_ctx 数组 对应下标处 */
         }
     }
 
@@ -264,24 +264,24 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     }
 
 
-    conf.ctx = cycle->conf_ctx;
-    conf.cycle = cycle;
-    conf.pool = pool;
+    conf.ctx = cycle->conf_ctx;  /* 指向保存着所有 Nginx 模块的配置结构体数组 */
+    conf.cycle = cycle; /* 指向当前的核心结构体 ngx_cycle_t */
+    conf.pool = pool; /* 指向当前核心结构体 ngx_cycle_t 所用的内存池 */
     conf.log = log;
-    conf.module_type = NGX_CORE_MODULE;
+    conf.module_type = NGX_CORE_MODULE; /* 默认初始化当前模块的类型为核心模块 */
     conf.cmd_type = NGX_MAIN_CONF;
 
 #if 0
     log->log_level = NGX_LOG_DEBUG_ALL;
 #endif
 
-    if (ngx_conf_param(&conf) != NGX_CONF_OK) {
+    if (ngx_conf_param(&conf) != NGX_CONF_OK) { /* 解析通过命令行传入的参数，若没有，则可忽略 */
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
     }
 
-    if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) {
+    if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) { /* 开始解析配置文件中的所有配置项, conf_file 保存着配置文件的绝对路径 */
         environ = senv;
         ngx_destroy_cycle_pools(&conf);
         return NULL;
@@ -292,15 +292,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
                        cycle->conf_file.data);
     }
 
-    for (i = 0; cycle->modules[i]; i++) {
+    for (i = 0; cycle->modules[i]; i++) { /* 遍历所有非核心模块 */
         if (cycle->modules[i]->type != NGX_CORE_MODULE) {
             continue;
         }
 
         module = cycle->modules[i]->ctx;
 
-        if (module->init_conf) {
-            if (module->init_conf(cycle,
+        if (module->init_conf) { 
+            if (module->init_conf(cycle, /* init_conf 是用于对上面解析完配置文件后对用户没有设置的核心模块配置指令设置默认值 */
                                   cycle->conf_ctx[cycle->modules[i]->index])
                 == NGX_CONF_ERROR)
             {
@@ -315,7 +315,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
         return cycle;
     }
 
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module); /* 从cycle->conf_ctx数组中取出ngx_core_module的配置信息结构体 */
 
     if (ngx_test_config) {
 
@@ -346,12 +346,12 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
     }
 
 
-    if (ngx_test_lockfile(cycle->lock_file.data, log) != NGX_OK) {
+    if (ngx_test_lockfile(cycle->lock_file.data, log) != NGX_OK) { /* 若当前系统不支持原子操作时则检测用于文件锁的文件是否打开， 若失败，则返回 error */
         goto failed;
     }
 
 
-    if (ngx_create_paths(cycle, ccf->user) != NGX_OK) {
+    if (ngx_create_paths(cycle, ccf->user) != NGX_OK) { /* 生成目录 */
         goto failed;
     }
 
@@ -412,10 +412,10 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
 
     /* create shared memory */
 
-    part = &cycle->shared_memory.part;
+    part = &cycle->shared_memory.part; /* 该 shared_memory 是由配置有启用共享内存的模块来添加的 */
     shm_zone = part->elts;
 
-    for (i = 0; /* void */ ; i++) {
+    for (i = 0; /* void */ ; i++) { /* 该 for 循环是检测新的将要创建的共享内存是否与旧的共享内存有冲突 */
 
         if (i >= part->nelts) {
             if (part->next == NULL) {
@@ -482,15 +482,15 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
             break;
         }
 
-        if (ngx_shm_alloc(&shm_zone[i].shm) != NGX_OK) {
+        if (ngx_shm_alloc(&shm_zone[i].shm) != NGX_OK) { /* mmap 映射一块共享内存 */
             goto failed;
         }
 
-        if (ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK) {
+        if (ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK) { /* 调用 slab 机制划分该共享内存 */
             goto failed;
         }
 
-        if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
+        if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {  /* 每个模块的共享内存都有自己特有的属性，因此调用各自的共享内存初始化函数 */
             goto failed;
         }
 
@@ -599,9 +599,9 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
         }
 
     } else {
-        ls = cycle->listening.elts;
+        ls = cycle->listening.elts; /* listening: 动态数组，每个数组元素存储着ngx_listening_t成员，表示监听端口及相关的参数 */
         for (i = 0; i < cycle->listening.nelts; i++) {
-            ls[i].open = 1;
+            ls[i].open = 1; /* 标志位，为1则表示在当前监听句柄有效，且执行ngx_init_cycle时不关闭监听端口，为0时则正常关闭。*/
 #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
             if (ls[i].accept_filter) {
                 ls[i].add_deferred = 1;
@@ -615,7 +615,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
         }
     }
 
-    if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+    if (ngx_open_listening_sockets(cycle) != NGX_OK) { /* 遍历nginx.conf中配置的所有需要监听的端口，创建socket */
         goto failed;
     }
 
@@ -632,7 +632,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle) //Nginx框架是围绕着 ngx_cycle_t 结
 
     pool->log = cycle->log;
 
-    if (ngx_init_modules(cycle) != NGX_OK) {
+    if (ngx_init_modules(cycle) != NGX_OK) { /* 调用所有模块的init_module方法 */
         /* fatal */
         exit(1);
     }
@@ -766,7 +766,7 @@ old_shm_zone_done:
 
     ngx_destroy_pool(conf.temp_pool);
 
-    if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
+    if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) { /* 若为 master_process 模式 */
 
         ngx_destroy_pool(old_cycle->pool);
         cycle->old_cycle = NULL;
