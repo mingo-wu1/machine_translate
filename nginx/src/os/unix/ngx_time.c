@@ -43,11 +43,11 @@ ngx_timezone_update(void)
     struct tm  *t; //{int tm_sec;  /*秒，正常范围0-59， 但允许至61*/ int tm_min;  /*分钟，0-59*/ int tm_hour; /*小时， 0-23*/ int tm_mday; /*日，即一个月中的第几天，1-31*/ int tm_mon;  /*月， 从一月算起，0-11*/  1+p->tm_mon; int tm_year;  /*年， 从1900至今已经多少年*/  1900＋ p->tm_year; int tm_wday; /*星期，一周中的第几天， 从星期日算起，0-6*/ int tm_yday; /*从今年1月1日到目前的天数，范围0-365*/ int tm_isdst; /*日光节约时间的旗标*/};    
     char        buf[4];
 
-    s = time(0);
+    s = time(0); //time(0)返回的是系统的时间（从1970.1.1午夜算起），单位：秒
 
-    t = localtime(&s);
+    t = localtime(&s); // struct tm *localtime(const time_t *timer) , timer这是指向表示日历时间的 time_t 值的指针。timer 的值被分解为 tm 结构返回，并用本地时区表示。
 
-    strftime(buf, 4, "%H", t);
+    strftime(buf, 4, "%H", t); // 根据区域设置格式化本地时间/日期，函数的功能将时间格式化，或者说格式化一个时间字符串。
 
 #endif
 }
