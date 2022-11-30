@@ -265,11 +265,11 @@ nginx_main(int argc, char *const *argv)
         return 1;
     }
 
-    if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
+    if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) { // argc, argv 参数保存下去，environ的参数也保存下去， cycle->log 不确定处理
         return 1;
     }
 
-    if (ngx_process_options(&init_cycle) != NGX_OK) {
+    if (ngx_process_options(&init_cycle) != NGX_OK) { // 初始化ngx_cycle的prefix, conf_prefix, conf_file, conf_param等字段；#define NGX_PREFIX  "/usr/local/nginx/", #define NGX_CONF_PREFIX  "conf/", #define NGX_CONF_PATH  "conf/nginx.conf"
         return 1;
     }
 
@@ -291,9 +291,16 @@ nginx_main(int argc, char *const *argv)
 
     ngx_slab_sizes_init(); // 无数据结构, 就变量 slab 大小的初始化 nginx 通过自己实现的slab机制来减少内存的碎片化 而nginx的slab机制相对于linux内核的slab机制就显得相对的简单, 通过nginx可以更快的理解slab机制。
 
-    if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) {
-        return 1;
-    }
+    /*  
+    Nginx在不重启服务升级时，也就是我们说过的平滑升级时，它会不重启master进程而启动新版本的Nginx程序。这样，旧版本的
+    master进程会通过execve系统调用来启动新版本的master进程（先fork出子进程再调用exec来运行新程序），这时旧版本的master
+    进程必须要通过一种方式告诉新版本的master进程这是在平滑升级，并且传递一些必要的信息。Nginx是通过环境变量来传递这些
+    信息的，新版本的master进程通过ngx_add_inherited_sockets方法由环境变量里读取平滑升级信息，并对旧版本Nginx服务监听的句柄做继承处理。
+    */
+	
+    if (ngx_add_inherited_sockets(&init_cycle) != NGX_OK) { // NGINX_VAR环境变量的设置是在平滑升级的时候才设置，nginx所采用的平滑升级能够保证在不中止服务的状况下更新nginx版本，具体需要看下ngx_exec_new_binary函数的实现。
+        return 1; // 函数通过环境变量NGINX完成socket的继承，继承来的socket将会放到init_cycle的listening数组中。在NGINX环境变量中，每个socket中间用冒号或分号隔开。完成继承同时设置全局变量ngx_inherited为1
+    } // 在执行不重启服务升级Nginx的操作时，老的Nginx进程会通过环境变量“NGINX”来传递需要打开的监听端口，新的Nginx进程会通过ngx_add_inherited_sockets方法来使用已经打开的TCP监听端口,不采用这种方式的话会报错，说该端口已经bind
 
     // typedef struct ngx_module_s      ngx_module_t;
     // struct ngx_module_s {
@@ -933,49 +940,49 @@ ngx_get_options(int argc, char *const *argv)
 }
 
 
-static ngx_int_t
+static ngx_int_t /*调用ngx_save_argv()保存命令行参数至全局变量ngx_os_argv、ngx_argc、ngx_argv中；*/
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
 #if (NGX_FREEBSD)
 
-    ngx_os_argv = (char **) argv;
-    ngx_argc = argc;
-    ngx_argv = (char **) argv;
+    ngx_os_argv = (char **) argv; // char **ngx_os_argv; //指向nginx运行时候所带的参数，见ngx_save_argv
+    ngx_argc = argc; // int ngx_argc;
+    ngx_argv = (char **) argv; // char **ngx_argv; //存放执行nginx时候所带的参数， 见ngx_save_argv
 
 #else
     size_t     len;
-    ngx_int_t  i;
+    ngx_int_t  i; // typedef intptr_t ngx_int_t; typedef long intptr_t
 
     ngx_os_argv = (char **) argv;
     ngx_argc = argc;
 
-    ngx_argv = ngx_alloc((argc + 1) * sizeof(char *), cycle->log);
+    ngx_argv = ngx_alloc((argc + 1) * sizeof(char *), cycle->log); // malloc
     if (ngx_argv == NULL) {
         return NGX_ERROR;
     }
 
     for (i = 0; i < argc; i++) {
-        len = ngx_strlen(argv[i]) + 1;
+        len = ngx_strlen(argv[i]) + 1; // strlen((const char *) s)
 
         ngx_argv[i] = ngx_alloc(len, cycle->log);
         if (ngx_argv[i] == NULL) {
             return NGX_ERROR;
         }
 
-        (void) ngx_cpystrn((u_char *) ngx_argv[i], (u_char *) argv[i], len);
+        (void) ngx_cpystrn((u_char *) ngx_argv[i], (u_char *) argv[i], len); // char 字符while循环拷贝
     }
 
     ngx_argv[i] = NULL;
 
 #endif
 
-    ngx_os_environ = environ;
+    ngx_os_environ = environ; // extern char **environ; char** env = environ; while(*env)printf("%s\n", *env); 跟控制台env看到差不多
 
     return NGX_OK;
 }
 
 
-static ngx_int_t
+static ngx_int_t // 初始化ngx_cycle的prefix, conf_prefix, conf_file, conf_param等字段；
 ngx_process_options(ngx_cycle_t *cycle)
 {
     u_char  *p;
