@@ -337,9 +337,9 @@ nginx_main(int argc, char *const *argv)
         return 1;
     }
 
-    cycle = ngx_init_cycle(&init_cycle);
+    cycle = ngx_init_cycle(&init_cycle); // old_cycle表示临时的ngx_cycle_t 指针，一般仅用来传递ngx_cycle_t结构体中的配置文件路径等参数, 返回初始化成功的完整的ngx_cycle_t结构体，该函数将会负责初始化ngx_cycle_t中的数据结构、解析配置文件、加载所有模块、打开监听端口、初始化进程间通信方式等工作。如果失败，则返回NULL空指针
     if (cycle == NULL) {
-        if (ngx_test_config) {
+        if (ngx_test_config) { // ngx_uint_t ngx_test_config; 命令行传入的参数导致此值会被修改
             ngx_log_stderr(0, "configuration file %s test failed",
                            init_cycle.conf_file.data);
         }
@@ -347,7 +347,7 @@ nginx_main(int argc, char *const *argv)
         return 1;
     }
 
-    if (ngx_test_config) {
+    if (ngx_test_config) { // ngx_uint_t ngx_test_config; 命令行传入的参数导致此值会被修改
         if (!ngx_quiet_mode) {
             ngx_log_stderr(0, "configuration file %s test is successful",
                            cycle->conf_file.data);
@@ -373,7 +373,13 @@ nginx_main(int argc, char *const *argv)
         return 0;
     }
 
-    if (ngx_signal) {
+    /*
+    如果加了-s 参数  这个记录的是-s参数带的参数，在main中的
+    if (ngx_signal) { //加了-S参数
+        return ngx_signal_process(cycle, ngx_signal);}
+    */ //信号发送ngx_signal_process
+    // static char *ngx_signal; //stop, quit, reopen, reload	
+    if (ngx_signal) { // 命令行，加了-S参数
         return ngx_signal_process(cycle, ngx_signal);
     }
 
