@@ -436,16 +436,16 @@ nginx_main(int argc, char *const *argv)
 
 #if !(NGX_WIN32)
 
-    if (ngx_init_signals(cycle->log) != NGX_OK) { // 初始化信号
+    if (ngx_init_signals(cycle->log) != NGX_OK) { // 初始化信号, 里面是将信号数字和带处理函数的处理结构体绑定，信号和函数映射
         return 1;
     }
 
-    if (!ngx_inherited && ccf->daemon) {
-        if (ngx_daemon(cycle->log) != NGX_OK) {
-            return 1;
+    if (!ngx_inherited && ccf->daemon) { // 启用ngx_daemon，在后台运行
+        if (ngx_daemon(cycle->log) != NGX_OK) { // 创建守护进程
+            return 1; // 创建守护进程失败, 可以做失败后的处理(如 写日志等);
         }
 
-        ngx_daemonized = 1;
+        ngx_daemonized = 1; // 创建守护进程成功, 执行守护进程中要做的工作
     }
 
     if (ngx_inherited) {
@@ -454,15 +454,15 @@ nginx_main(int argc, char *const *argv)
 
 #endif
 
-    if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) {
+    if (ngx_create_pidfile(&ccf->pid, cycle->log) != NGX_OK) { // 创建pid文件，创建进程记录文件，ngx_open_file，ngx_close_file,创建nginx.pid文件，将进程号写进去。保存进程号
         return 1;
     }
 
-    if (ngx_log_redirect_stderr(cycle) != NGX_OK) {
-        return 1;
+    if (ngx_log_redirect_stderr(cycle) != NGX_OK) { // 把cycle->log fd设置为STDERR_FILENO， 将stderr重定向到ngx_log_t, // fd = ngx_log_get_file_log(cycle->log)->file->fd; if(ngx_set_stderr(fd) 
+        return 1; // 即后续往标准错误里面写入的东西，都会体现在log文件句柄中
     }
 
-    if (log->file->fd != ngx_stderr) {
+    if (log->file->fd != ngx_stderr) { // 不等于 stderr 就关闭file
         if (ngx_close_file(log->file->fd) == NGX_FILE_ERROR) {
             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                           ngx_close_file_n " built-in log failed");
@@ -470,11 +470,11 @@ nginx_main(int argc, char *const *argv)
     }
 
     ngx_use_stderr = 0;
+    // 下面启动进程循环
+    if (ngx_process == NGX_PROCESS_SINGLE) { //NGX_PROCESS_SINGLE — 单进程只存在于master_process模式模式的情况下。生命周期函数是ngx_single_process_cycle()。这个进程创建生命周期并且处理客户端连接。
+        ngx_single_process_cycle(cycle); // 如果hginx.conf中配置为单进程工作模式，这时将会调用ngx_single_process_cycle方法进入单迸程工作模式。 //如果配置的是单进程工作模式，好像不会走到这里
 
-    if (ngx_process == NGX_PROCESS_SINGLE) {
-        ngx_single_process_cycle(cycle);
-
-    } else {
+    } else { //一般都是走到这里，master方式
         ngx_master_process_cycle(cycle);
     }
 
