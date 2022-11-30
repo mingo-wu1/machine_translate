@@ -251,7 +251,7 @@ nginx_main(int argc, char *const *argv)
     ngx_cycle = &init_cycle;
 
     /*struct ngx_pool_s { // 结构体链表, nginx的内存池实际是一个由ngx_pool_data_t和ngx_pool_s构成的链表, 说明图:https://blog.csdn.net/Linuxhus/article/details/112845863
-	    ngx_pool_data_t       d;
+	    ngx_pool_data_t       d; //有点数据域的意思
 	    size_t                max;
 	    ngx_pool_t           *current;
 	    ngx_chain_t          *chain;
@@ -261,7 +261,7 @@ nginx_main(int argc, char *const *argv)
 	};*/
     
     init_cycle.pool = ngx_create_pool(1024, log); // ngx_pool_t  *p;p = ngx_memalign(NGX_POOL_ALIGNMENT, size, log);p->d.last = (u_char *) p + sizeof(ngx_pool_t);p->d.end = (u_char *) p + size;
-    if (init_cycle.pool == NULL) {
+    if (init_cycle.pool == NULL) { /*初始化init_cycle.pool, init_cycle 是一个非常庞大struct，里面包含了内存池，log，array,list，event，套节字，主机名 等等一系列信息*/ 
         return 1;
     }
 
@@ -380,22 +380,63 @@ nginx_main(int argc, char *const *argv)
     */ //信号发送ngx_signal_process
     // static char *ngx_signal; //stop, quit, reopen, reload	
     if (ngx_signal) { // 命令行，加了-S参数
-        return ngx_signal_process(cycle, ngx_signal);
-    }
+        return ngx_signal_process(cycle, ngx_signal); // return ngx_os_signal_process(cycle, sig, pid);
+    } // 遍历ngx_signal_t*数组然后发送，ngx_signal_t  *sig; for (sig = signals; sig->signo != 0; sig++) { if (ngx_strcmp(name, sig->name) == 0) { if (kill(pid, sig->signo) != -1) {
 
-    ngx_os_status(cycle->log);
+    ngx_os_status(cycle->log); /*实际是写log*/
 
-    ngx_cycle = cycle;
+    //struct ngx_cycle_s { // 链表    
+    //    void                  ****conf_ctx; /* 保存着所有模块存储配置项的结构体指针，它首先是一个数组，每个数组成员又是一个指针，这个指针指向另一个存储着指针的数组 */
+    //    ngx_pool_t               *pool; // 链表 //内存池
+    //    ngx_log_t                *log; // 链表 /* 日志模块中提供生成计本ngx_log_t日志对象的功能，这里的log是还没有解析配置前，重定向到屏幕的。在ngx_init_cycle函数执行后，会更需nginx.conf中的配置项重新构造出log */   
+    //    ngx_log_t                 new_log; // 一个链表单元 /* new_log暂时存储根据nginx.conf生成的新log，之后会赋值给上述log */ '新的log模块'
+    //    ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */    
+    //    ngx_connection_t        **files; // 二维结构体数组    /* 对于poll、rtsig这样的事件模块，会以有效文件句柄来预先建立ngx_connection_t结构体，以加速事件的收集和分发。这时，files就会保存所有ngx_connection_t的指针组成的数组。 */
+    //    ngx_connection_t         *free_connections; // 结构体数组    //可用连接池 '空闲链接池的第一个指针，每次事件处理完成。都会从这里面获取新的链接结构
+    //    ngx_uint_t                free_connection_n;    //可用连接池的总数 '空闲链接池数'
+    //    ngx_queue_t               reusable_connections_queue; //队列     //可以重复使用连接队列 '可重复使用的双向链接队列'
+    //    ngx_array_t               listening; // 数组    //监听端口数组，ngx_listening_t '套接字数组'
+    //    ngx_array_t               paths; // 数组 //保存着Nginx所有要操作的目录 '保存nginx所要操做的目录，若是目录不存在。则建立目录失败将致使NGINX启动失
+    //    ngx_list_t                open_files; // 结构体 + 内部链表     //ngx_open_file_t结构体组成的数组，表示Nginx已经打开的所有文件。由模块添加，ngx_init_cycle中打开 '已打开的全部文件列表'
+    //    ngx_list_t                shared_memory; // 结构体 + 内部链表    //ngx_shm_zone_t组成的数组，每个元素表示一块共享内存 '共享内存列表'
+    //    ngx_uint_t                connection_n; // u int //当前进程中所有连接对象的总数 '进程中全部链接对象的总数'
+    //    ngx_uint_t                files_n; // u int //上述files中存在的有效文件句柄个数 'connection_n 中的总数'
+    //    ngx_connection_t         *connections; // 结构体数组 //指向当前进程中的所有连接对象 '指向当前进程中的全部链接对象，每一个链接对象应对一个写和读事件'
+    //    ngx_event_t              *read_events; // 结构体数组 //指向当前进程中的所有读事件对象 '读事件、connections表明读事件总数'   
+    //    ngx_event_t              *write_events; // 结构体数组 //指向当前进程中所有写事件对象 '写事件、connections表明读事件总数'   
+    //    ngx_cycle_t              *old_cycle; // 链表 //用于引用上一个ngx_cycle_t对象 '旧的cyc，在ngx_init_cycle时的入参'   
+    //    ngx_str_t                 conf_file; // 字符串结构体    typedef struct {size_t      len;u_char     *data;} ngx_str_t; //配置文件相对于安装目录的路径名称 '配置文件相对于安装目录的路径名称'
+    //    ngx_str_t                 conf_param; //处理配置文件时需要特殊处理的命令行携带参数 'nginx命令的参数'
+    //    ngx_str_t                 conf_prefix; //配置文件所在目录的路径  '配置文件 nginx.conf的目录'  
+    //    ngx_str_t                 prefix; //Nginx安装目录的路径 'nginx的安装路径'  
+    //    ngx_str_t                 lock_file; //用于进程间同步文件锁名称 '文件锁'
+    //    ngx_str_t                 hostname; //gethostname得到的主机名 '主机名'
+    //};
+	
+    ngx_cycle = cycle; // volatile ngx_cycle_t  *ngx_cycle; 全局变量
 
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module); // 获取ngx_core_module模块对应的配置 #define ngx_get_conf(conf_ctx, module)  conf_ctx[module.index]
 
-    if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
+    /*
+    nginx有好几种进程类型。当前进程的类型保存在ngx_process这个全局变量。
+    NGX_PROCESS_MASTER — 主进程运行ngx_master_process_cycle()这个函数。主进程不能有任何的I/O，并且只对信号响应。它读取配置，创建cycle，启动和控制子进程。
+    NGX_PROCESS_WORKER — 工作进程运行ngx_worker_process_cycle()函数。工作进程由子进程创建，处理客户端连接。他们同样也响应来自主进程的信号。
+    NGX_PROCESS_SINGLE — 单进程只存在于master_process模式模式的情况下。生命周期函数是ngx_single_process_cycle()。这个进程创建生命周期并且处理客户端连接。
+    NGX_PROCESS_HELPER — 目前只有两种help进程：cache manager 和 cache loader. 它们共用同样的生命周期函数ngx_cache_manager_process_cycle()。
+    #define NGX_PROCESS_SINGLE     0
+    #define NGX_PROCESS_MASTER     1
+    #define NGX_PROCESS_SIGNALLER  2
+    #define NGX_PROCESS_WORKER     3
+    #define NGX_PROCESS_HELPER     4
+    */
+	
+    if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) { // 在这里会把进程模式设置为MASTER模式
         ngx_process = NGX_PROCESS_MASTER;
     }
 
 #if !(NGX_WIN32)
 
-    if (ngx_init_signals(cycle->log) != NGX_OK) {
+    if (ngx_init_signals(cycle->log) != NGX_OK) { // 初始化信号
         return 1;
     }
 
