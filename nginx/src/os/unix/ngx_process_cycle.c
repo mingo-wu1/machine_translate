@@ -508,9 +508,14 @@ ngx_pass_open_channel(ngx_cycle_t *cycle)
     }
 }
 
-
-static void
-ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
+/*
+NGX_PROCESS_JUST_RESPAWN标识最终会在ngx_spawn_process()创建worker进程时，将ngx_processes[s].just_spawn = 1，以此作为区别旧的worker进程的标记。
+之后，执行：
+ngx_signal_worker_processes(cycle, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));  
+以此关闭旧的worker进程。进入该函数，你会发现它也是循环向所有worker进程发送信号，所以它会先把旧worker进程关闭，然后再管理新的worker进程。
+*/
+static void // ngx_reap_children和ngx_signal_worker_processes对应
+ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo) //向进程发送signo信号
 {
     ngx_int_t      i;
     ngx_err_t      err;
@@ -590,7 +595,7 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
         ngx_log_debug2(NGX_LOG_DEBUG_CORE, cycle->log, 0,
                        "kill (%P, %d)", ngx_processes[i].pid, signo);
 
-        if (kill(ngx_processes[i].pid, signo) == -1) {
+        if (kill(ngx_processes[i].pid, signo) == -1) {  //关闭旧的进程
             err = ngx_errno;
             ngx_log_error(NGX_LOG_ALERT, cycle->log, err,
                           "kill(%P, %d) failed", ngx_processes[i].pid, signo);
@@ -611,8 +616,8 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 }
 
 
-static ngx_uint_t
-ngx_reap_children(ngx_cycle_t *cycle)
+static ngx_uint_t //这个里面处理退出的子进程(有的worker异常退出，这时我们就需要重启这个worker )，如果所有子进程都退出则会返回0
+ngx_reap_children(ngx_cycle_t *cycle) //ngx_reap_children和ngx_signal_worker_processes对应
 {
     ngx_int_t         i, n;
     ngx_uint_t        live;
@@ -775,20 +780,25 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
     exit(0);
 }
 
-
+/*
+                                 |----------(ngx_worker_process_cycle->ngx_worker_process_init)
+    ngx_start_worker_processes---| ngx_processes[]相关的操作赋值流程
+                                 |----------ngx_pass_open_channel
+*/
+//在Nginx主循环（这里的主循环是ngx_worker_process_cycle方法）中，会定期地调用事件模块，以检查是否有网络事件发生
 static void
-ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
+ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data) //data表示这是第几个worker进程
 {
-    ngx_int_t worker = (intptr_t) data;
+    ngx_int_t worker = (intptr_t) data; //worker表示绑定到第几个cpu上
 
     ngx_process = NGX_PROCESS_WORKER;
     ngx_worker = worker;
 
-    ngx_worker_process_init(cycle, worker);
+    ngx_worker_process_init(cycle, worker); //主要工作是把CPU和进程绑定
 
     ngx_setproctitle("worker process");
 
-    for ( ;; ) {
+    for ( ;; ) { // 在ngx_worker_process_cycle有法中，通过检查ngx_exiting、ngx_terminate、ngx_quit、ngx_reopen这4个标志位来决定后续动作。
 
         if (ngx_exiting) {
             if (ngx_event_no_timers_left() == NGX_OK) {
