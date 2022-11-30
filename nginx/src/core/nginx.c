@@ -246,11 +246,21 @@ nginx_main(int argc, char *const *argv)
      * ngx_process_options()
      */
 
-    ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
+    ngx_memzero(&init_cycle, sizeof(ngx_cycle_t)); // #define ngx_memzero(buf, n)       (void) memset(buf, 0, n)
     init_cycle.log = log;
     ngx_cycle = &init_cycle;
 
-    init_cycle.pool = ngx_create_pool(1024, log);
+    /*struct ngx_pool_s { // 结构体链表, nginx的内存池实际是一个由ngx_pool_data_t和ngx_pool_s构成的链表, 说明图:https://blog.csdn.net/Linuxhus/article/details/112845863
+	    ngx_pool_data_t       d;
+	    size_t                max;
+	    ngx_pool_t           *current;
+	    ngx_chain_t          *chain;
+	    ngx_pool_large_t     *large;
+	    ngx_pool_cleanup_t   *cleanup;
+	    ngx_log_t            *log;
+	};*/
+    
+    init_cycle.pool = ngx_create_pool(1024, log); // ngx_pool_t  *p;p = ngx_memalign(NGX_POOL_ALIGNMENT, size, log);p->d.last = (u_char *) p + sizeof(ngx_pool_t);p->d.end = (u_char *) p + size;
     if (init_cycle.pool == NULL) {
         return 1;
     }
