@@ -1079,11 +1079,18 @@ ngx_delete_pidfile(ngx_cycle_t *cycle)
 }
 
 
+/*
+该函数作用：
+读取ngx_core_module模块的配置结构ngx_core_conf_t；
+根据配置结构找到其工作进程文件，如"/usr/local/nginx/logs/nginx.pid"(该文件保存nginx进程ID，即pid)；
+打开该文件，读取pid；
+调用ngx_os_signal_process()发送信号；
+*/
 ngx_int_t
 ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 {
     ssize_t           n;
-    ngx_pid_t         pid;
+    ngx_int_t         pid;
     ngx_file_t        file;
     ngx_core_conf_t  *ccf;
     u_char            buf[NGX_INT64_LEN + 2];
@@ -1094,6 +1101,7 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     ngx_memzero(&file, sizeof(ngx_file_t));
 
+    //打开存放master进程的文件NGX_PID_PATH
     file.name = ccf->pid;
     file.log = cycle->log;
 
@@ -1119,9 +1127,9 @@ ngx_signal_process(ngx_cycle_t *cycle, char *sig)
 
     while (n-- && (buf[n] == CR || buf[n] == LF)) { /* void */ }
 
-    pid = ngx_atoi(buf, ++n);
+    pid = ngx_atoi(buf, ++n); //master进程id
 
-    if (pid == (ngx_pid_t) NGX_ERROR) {
+    if (pid == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
                       "invalid PID number \"%*s\" in \"%s\"",
                       n, buf, file.name.data);
