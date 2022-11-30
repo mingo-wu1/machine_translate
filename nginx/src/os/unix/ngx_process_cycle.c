@@ -70,8 +70,14 @@ static ngx_log_t        ngx_exit_log;
 static ngx_open_file_t  ngx_exit_log_file;
 
 
-void
-ngx_master_process_cycle(ngx_cycle_t *cycle)
+/*
+ngx_master_process_cycle 调 用 ngx_start_worker_processes生成多个工作子进程，ngx_start_worker_processes 调 用 ngx_worker_process_cycle
+创建工作内容，如果进程有多个子线程，这里也会初始化线程和创建线程工作内容，初始化完成之后，ngx_worker_process_cycle 
+会进入处理循环，调用 ngx_process_events_and_timers ， 该 函 数 调 用 ngx_process_events监听事件，
+并把事件投递到事件队列ngx_posted_events 中 ， 最 终 会 在 ngx_event_thread_process_posted中处理事件。
+*/
+void // master进程不需要处理网络事件，它不负责业务的执行，只会通过管理worker等子进程来实现重启服务、平滑升级、更换日志文件、配置文件实时生效等功能
+ngx_master_process_cycle(ngx_cycle_t *cycle) // 如果是多进程方式启动，就会调用ngx_master_process_cycle完成最后的启动动作 
 {
     char              *title;
     u_char            *p;
@@ -96,7 +102,22 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
     sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
 
-    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+     /*
+     每个进程有一个信号掩码(signal mask)。简单地说，信号掩码是一个“位图”，其中每一位都对应着一种信号
+     如果位图中的某一位为1，就表示在执行当前信号的处理程序期间相应的信号暂时被“屏蔽”，使得在执行的过程中不会嵌套地响应那种信号。
+     
+     为什么对某一信号进行屏蔽呢？我们来看一下对CTRL_C的处理。大家知道，当一个程序正在运行时，在键盘上按一下CTRL_C，内核就会向相应的进程
+     发出一个SIGINT 信号，而对这个信号的默认操作就是通过do_exit()结束该进程的运行。但是，有些应用程序可能对CTRL_C有自己的处理，所以就要
+     为SIGINT另行设置一个处理程序，使它指向应用程序中的一个函数，在那个函数中对CTRL_C这个事件作出响应。但是，在实践中却发现，两次CTRL_C
+     事件往往过于密集，有时候刚刚进入第一个信号的处理程序，第二个SIGINT信号就到达了，而第二个信号的默认操作是杀死进程，这样，第一个信号
+     的处理程序根本没有执行完。为了避免这种情况的出现，就在执行一个信号处理程序的过程中将该种信号自动屏蔽掉。所谓“屏蔽”，与将信号忽略
+     是不同的，它只是将信号暂时“遮盖”一下，一旦屏蔽去掉，已到达的信号又继续得到处理。
+     
+     所谓屏蔽, 并不是禁止递送信号, 而是暂时阻塞信号的递送,
+     解除屏蔽后, 信号将被递送, 不会丢失
+     */ // 设置这些信号都阻塞，等我们sigpending调用才告诉我有这些事件
+    
+    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {  //参考下面的sigsuspend //父子进程的继承关系可以参考:http://blog.chinaunix.net/uid-20011314-id-1987626.html
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "sigprocmask() failed");
     }
@@ -116,28 +137,59 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
         exit(2);
     }
 
-    p = ngx_cpymem(title, master_process, sizeof(master_process) - 1);
+    p = ngx_cpymem(title, master_process, sizeof(master_process) - 1); /* 把master process + 参数一起主持主进程名 */
     for (i = 0; i < ngx_argc; i++) {
         *p++ = ' ';
         p = ngx_cpystrn(p, (u_char *) ngx_argv[i], size);
     }
 
-    ngx_setproctitle(title);
+    ngx_setproctitle(title); //修改进程名为title
 
 
-    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module); // 获取模块配置
 
     ngx_start_worker_processes(cycle, ccf->worker_processes,
-                               NGX_PROCESS_RESPAWN);
-    ngx_start_cache_manager_processes(cycle, 0);
+                               NGX_PROCESS_RESPAWN); //启动worker进程
+    ngx_start_cache_manager_processes(cycle, 0); //启动cache manager， cache loader进程
 
     ngx_new_binary = 0;
     delay = 0;
     sigio = 0;
     live = 1;
 
+    /*
+    ngx_signal_handler方法会根据接收到的信号设置ngx_reap. ngx_quit. ngx_terminate.
+    ngx_reconfigure. ngx_reopen. ngx_change_binary. ngx_noaccept这些标志位，见表8-40
+    表8-4进程中接收到的信号对Nginx框架的意义
+    ┏━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+    ┃    信  号    ┃  对应进程中的全局标志位变量  ┃    意义                                        ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃  QUIT        ┃    ngx_quit                  ┃  优雅地关闭整个服务                            ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃  TERM或者INT ┃ngx_terminate                 ┃  强制关闭整个服务                              ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃  USR1        ┃    ngx reopen                ┃  重新打开股务中的所有文件                      ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃              ┃                              ┃  所有子进程不再接受处理新的连接，实际相当于对  ┃
+    ┃  WINCH       ┃ngx_noaccept                  ┃                                                ┃
+    ┃              ┃                              ┃所有的予进程发送QUIT信号量                      ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃  USR2        ┃ngx_change_binary             ┃  平滑升级到新版本的Nginx程序                   ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃  HUP         ┃ngx_reconfigure               ┃  重读配置文件并使服务对新配景项生效            ┃
+    ┣━━━━━━━╋━━━━━━━━━━━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━┫
+    ┃              ┃                              ┃  有子进程意外结束，这时需要监控所有的子进程，  ┃
+    ┃  CHLD        ┃    ngx_reap                  ┃也就是ngx_reap_children方法所做的工作           ┃
+    ┗━━━━━━━┻━━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━━━━━━━━━━━┛
+        表8-4列出了master工作流程中的7个全局标志位变量。除此之外，还有一个标志位也
+    会用到，它仅仅是在master工作流程中作为标志位使用的，与信号无关。
+
+    实际上，根据以下8个标志位：ngx_reap、ngx_terminate、ngx_quit、ngx_reconfigure、ngx_restart、ngx_reopen、ngx_change_binary、
+    ngx_noaccept，决定执行不同的分支流程，并循环执行（注意，每次一个循环执行完毕后进程会被挂起，直到有新的信号才会激活继续执行）。
+    */
+    
     for ( ;; ) {
-        if (delay) {
+        if (delay) { //delay用来等待子进程退出的时间，由于我们接受到SIGINT信号后，我们需要先发送信号给子进程，而子进程的退出需要一定的时间，超时时如果子进程已退出，我们父进程就直接退出，否则发送sigkill信号给子进程(强制退出),然后再退出。          
             if (ngx_sigalrm) {
                 sigio = 0;
                 delay *= 2;
@@ -152,7 +204,17 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             itv.it_value.tv_sec = delay / 1000;
             itv.it_value.tv_usec = (delay % 1000 ) * 1000;
 
-            if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+            /*
+            setitimer(int which, const struct itimerval *value, struct itimerval *ovalue)); 
+            setitimer()比alarm功能强大，支持3种类型的定时器： 
+            
+            ITIMER_REAL： 设定绝对时间；经过指定的时间后，内核将发送SIGALRM信号给本进程；
+            ITIMER_VIRTUAL 设定程序执行时间；经过指定的时间后，内核将发送SIGVTALRM信号给本进程；
+            ITIMER_PROF 设定进程执行以及内核因本进程而消耗的时间和，经过指定的时间后，内核将发送ITIMER_VIRTUAL信号给本进程；
+            
+            */ //设置定时器，以系统真实时间来计算，送出SIGALRM信号,这个信号反过来会设置ngx_sigalrm为1，这样delay就会不断翻倍。
+            
+            if (setitimer(ITIMER_REAL, &itv, NULL) == -1) { //每隔itv时间发送一次SIGALRM信号
                 ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                               "setitimer() failed");
             }
@@ -160,26 +222,45 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
 
-        sigsuspend(&set);
+        /*
+          sigsuspend(const sigset_t *mask))用于在接收到某个信号之前, 临时用mask替换进程的信号掩码, 并暂停进程执行，直到收到信号为止。
+          sigsuspend 返回后将恢复调用之前的信号掩码。信号处理函数完成后，进程将继续执行。该系统调用始终返回-1，并将errno设置为EINTR。
+
+         
+          其实sigsuspend是一个原子操作，包含4个步骤：
+          (1) 设置新的mask阻塞当前进程；
+          (2) 收到信号，恢复原先mask；
+          (3) 调用该进程设置的信号处理函数；
+          (4) 待信号处理函数返回后，sigsuspend返回。
+          
+          */ 
+        /*
+        等待信号发生,前面sigprocmask后有设置sigemptyset(&set);所以这里会等待接收所有信号，只要有信号到来则返回。例如定时信号  ngx_reap ngx_terminate等信号
+        从上面的(2)步骤可以看出在处理函数中执行信号中断函数的嘿嘿，由于这时候已经恢复了原来的mask(也就是上面sigprocmask设置的掩码集)
+        所以在信号处理函数中不会再次引起接收信号，只能在该while()循环再次走到sigsuspend的时候引起信号中断，从而避免了同一时刻多次中断同一信号
+        */
+        //nginx sigsuspend分析，参考http://weakyon.com/2015/05/14/learning-of-sigsuspend.html
+        
+        sigsuspend(&set); //等待定时器超时，通过ngx_init_signals执行ngx_signal_handler中的SIGALRM信号，信号处理函数返回后，继续该函数后面的操作
 
         ngx_time_update();
 
         ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                        "wake up, sigio %i", sigio);
 
-        if (ngx_reap) {
+        if (ngx_reap) { //父进程收到一个子进程退出的信号，见ngx_signal_handler
             ngx_reap = 0;
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
 
-            live = ngx_reap_children(cycle);
+            live = ngx_reap_children(cycle); //这个里面处理退出的子进程(有的worker异常退出，这时我们就需要重启这个worker )，如果所有子进程都退出则会返回0. // 有子进程意外结束，这时需要监控所有的子进程，也就是ngx_reap_children方法所做的工作
         }
 
         if (!live && (ngx_terminate || ngx_quit)) {
             ngx_master_process_exit(cycle);
         }
 
-        if (ngx_terminate) {
-            if (delay == 0) {
+        if (ngx_terminate) { //收到了sigint信号
+            if (delay == 0) { //设置延时
                 delay = 50;
             }
 
@@ -190,29 +271,29 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
             sigio = ccf->worker_processes + 2 /* cache processes */;
 
-            if (delay > 1000) {
-                ngx_signal_worker_processes(cycle, SIGKILL);
+            if (delay > 1000) { //如果超时，则强制杀死worker
+                ngx_signal_worker_processes(cycle, SIGKILL); // 给worker发送信号 //如果超时，则强制杀死worker
             } else {
-                ngx_signal_worker_processes(cycle,
+                ngx_signal_worker_processes(cycle, // 给worker发送信号， //负责发送sigint给worker，让它退出
                                        ngx_signal_value(NGX_TERMINATE_SIGNAL));
             }
 
             continue;
         }
 
-        if (ngx_quit) {
-            ngx_signal_worker_processes(cycle,
+        if (ngx_quit) { //收到quit信号
+            ngx_signal_worker_processes(cycle, //发送给worker quit信号
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
             ngx_close_listening_sockets(cycle);
 
             continue;
         }
 
-        if (ngx_reconfigure) {
+        if (ngx_reconfigure) { //收到需要reconfig的信号，重读配置文件并使服务对新配景项生效 
             ngx_reconfigure = 0;
 
-            if (ngx_new_binary) {
-                ngx_start_worker_processes(cycle, ccf->worker_processes,
+            if (ngx_new_binary) { //判断是否热代码替换后的新的代码还在运行中(也就是还没退出当前的master)。如果还在运行中，则不需要重新初始化config
+                ngx_start_worker_processes(cycle, ccf->worker_processes, //调用ngx_start_worker_processes方法再拉起一批worker进程
                                            NGX_PROCESS_RESPAWN);
                 ngx_start_cache_manager_processes(cycle, 0);
                 ngx_noaccepting = 0;
@@ -222,7 +303,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
 
-            cycle = ngx_init_cycle(cycle);
+            cycle = ngx_init_cycle(cycle); //重新初始化config，并重新启动新的worker
             if (cycle == NULL) {
                 cycle = (ngx_cycle_t *) ngx_cycle;
                 continue;
@@ -231,15 +312,15 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             ngx_cycle = cycle;
             ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                    ngx_core_module);
-            ngx_start_worker_processes(cycle, ccf->worker_processes,
+            ngx_start_worker_processes(cycle, ccf->worker_processes, //调用ngx_start_worker_processes方法再拉起一批worker进程，这些worker进程将使用新ngx_cycle_t绪构体
                                        NGX_PROCESS_JUST_RESPAWN);
-            ngx_start_cache_manager_processes(cycle, 1);
+            ngx_start_cache_manager_processes(cycle, 1); //调用ngx_start_cache_manager_processes方法，按照缓存模块的加载情况决定是否拉起cache manage或者cache loader进程，在这两个方法调用后，肯定是存在子进程了，这时会把live标志位置为1
 
             /* allow new processes to start */
             ngx_msleep(100);
 
             live = 1;
-            ngx_signal_worker_processes(cycle,
+            ngx_signal_worker_processes(cycle, //向原先的（并非刚刚拉起的）所有子进程发送QUIT信号，要求它们优雅地退出自己的进程
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
 
@@ -251,24 +332,24 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
             live = 1;
         }
 
-        if (ngx_reopen) {
+        if (ngx_reopen) { // 如果ngx_reopen为1，则调用ngx_reopen_files穷法重新打开所有文件，同时将ngx_reopen标志位置为0，向所有子进程发送USRI信号，要求子进程都得重新打开所有文件
             ngx_reopen = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
             ngx_reopen_files(cycle, ccf->user);
-            ngx_signal_worker_processes(cycle,
+            ngx_signal_worker_processes(cycle, // 给worker发送信号
                                         ngx_signal_value(NGX_REOPEN_SIGNAL));
         }
 
-        if (ngx_change_binary) {
+        if (ngx_change_binary) { // 平滑升级到新版本的Nginx程序
             ngx_change_binary = 0;
             ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "changing binary");
-            ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv);
+            ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv); // 进行热代码替换，这里是调用execve来执行新的代码
         }
 
-        if (ngx_noaccept) {
+        if (ngx_noaccept) { // 所有子进程不再接受处理新的连接，实际相当于对所有的予进程发送QUIT信号量
             ngx_noaccept = 0;
             ngx_noaccepting = 1;
-            ngx_signal_worker_processes(cycle,
+            ngx_signal_worker_processes(cycle, // 给worker发送信号
                                         ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
         }
     }
