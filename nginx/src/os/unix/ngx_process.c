@@ -287,19 +287,19 @@ ngx_init_signals(ngx_log_t *log)
     ngx_signal_t      *sig;
     struct sigaction   sa;
 
-    for (sig = signals; sig->signo != 0; sig++) {
+    for (sig = signals; sig->signo != 0; sig++) { // 遍历signals数组。处理每个ngx_signal_t类型的结构体
         ngx_memzero(&sa, sizeof(struct sigaction));
 
         if (sig->handler) {
-            sa.sa_sigaction = sig->handler;
+            sa.sa_sigaction = sig->handler; // 设置信号的处理方法为handler方法
             sa.sa_flags = SA_SIGINFO;
 
         } else {
             sa.sa_handler = SIG_IGN;
         }
 
-        sigemptyset(&sa.sa_mask); // 信号集初始化为空
-        if (sigaction(sig->signo, &sa, NULL) == -1) { // 修改信号的处理函数
+        sigemptyset(&sa.sa_mask); // 信号集初始化为空 //将sa中的为所有设置为0
+        if (sigaction(sig->signo, &sa, NULL) == -1) { //struct sigaction act; act.sa_handler = docatch函数; 修改信号的处理函数, 注冊信号的回调方法, sigaction(信号数字，带函数的处理结构体)会依参数signum指定的信号编号来设置该信号的处理函数
 #if (NGX_VALGRIND)
             ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
                           "sigaction(%s) failed, ignored", sig->signame);
