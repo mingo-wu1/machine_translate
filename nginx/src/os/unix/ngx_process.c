@@ -298,8 +298,8 @@ ngx_init_signals(ngx_log_t *log)
             sa.sa_handler = SIG_IGN;
         }
 
-        sigemptyset(&sa.sa_mask);
-        if (sigaction(sig->signo, &sa, NULL) == -1) {
+        sigemptyset(&sa.sa_mask); // 信号集初始化为空
+        if (sigaction(sig->signo, &sa, NULL) == -1) { // 修改信号的处理函数
 #if (NGX_VALGRIND)
             ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
                           "sigaction(%s) failed, ignored", sig->signame);
