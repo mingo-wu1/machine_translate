@@ -1,4 +1,5 @@
 #### HTTP
+accept新创建的连接被添加到epoll中，然后调用ngx_http_init_connection来初始化http request，并将ngx_http_wait_request_handler赋值给rev->handler，这样无论是在epoll返回时调用rev->handler还是在处理ngx_posted_events队列时调用，都是相当于直接调用ngx_http_wait_request_handler来读取http的请求数据。至此，就将event模块和http模块连接起来，整个nginx的处理流程也就走通了。
 
 ```
 ////////////  nginx/src/event/ngx_event_accept.c  /////////////
