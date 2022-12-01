@@ -148,9 +148,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle) // 如果是多进程方式启动�
 
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module); // 获取模块配置
 
-    ngx_start_worker_processes(cycle, ccf->worker_processes,
+    ngx_start_worker_processes(cycle, ccf->worker_processes, // 实际调用ngx_spawn_process 下面的 proc(cycle, data); 实际调用 ngx_worker_process_cycle， 实际调用ngx_process_events_and_timers，实际调用event函数
                                NGX_PROCESS_RESPAWN); //启动worker进程
-    ngx_start_cache_manager_processes(cycle, 0); //启动cache manager， cache loader进程
+    ngx_start_cache_manager_processes(cycle, 0); //启动cache manager， cache loader进程 // 实际调用ngx_spawn_process 下面的 proc(cycle, data);
 
     ngx_new_binary = 0;
     delay = 0;
@@ -294,9 +294,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle) // 如果是多进程方式启动�
 
             if (ngx_new_binary) { //判断是否热代码替换后的新的代码还在运行中(也就是还没退出当前的master)。如果还在运行中，则不需要重新初始化config
                 ngx_start_worker_processes(cycle, ccf->worker_processes, //调用ngx_start_worker_processes方法再拉起一批worker进程
-                                           NGX_PROCESS_RESPAWN);
-                ngx_start_cache_manager_processes(cycle, 0);
-                ngx_noaccepting = 0;
+                                           NGX_PROCESS_RESPAWN); // 实际调用ngx_spawn_process 下面的 proc(cycle, data); // 调用proc回调函数，即ngx_worker_process_cycle,之后worker子进程从这里开始执行
+                ngx_start_cache_manager_processes(cycle, 0);  // 实际调用ngx_spawn_process->proc(cycle, data); // 调用proc回调函数，即ngx_worker_process_cycle,之后worker子进程从这里开始执行
+                ngx_noaccepting = 0; // 上面的ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,char *name, ngx_int_t respawn)
 
                 continue;
             }
@@ -313,8 +313,8 @@ ngx_master_process_cycle(ngx_cycle_t *cycle) // 如果是多进程方式启动�
             ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
                                                    ngx_core_module);
             ngx_start_worker_processes(cycle, ccf->worker_processes, //调用ngx_start_worker_processes方法再拉起一批worker进程，这些worker进程将使用新ngx_cycle_t绪构体
-                                       NGX_PROCESS_JUST_RESPAWN);
-            ngx_start_cache_manager_processes(cycle, 1); //调用ngx_start_cache_manager_processes方法，按照缓存模块的加载情况决定是否拉起cache manage或者cache loader进程，在这两个方法调用后，肯定是存在子进程了，这时会把live标志位置为1
+                                       NGX_PROCESS_JUST_RESPAWN); // 实际调用ngx_spawn_process 下面的 proc(cycle, data);
+            ngx_start_cache_manager_processes(cycle, 1); // 实际调用ngx_spawn_process 下面的 proc(cycle, data); 调用ngx_start_cache_manager_processes方法，按照缓存模块的加载情况决定是否拉起cache manage或者cache loader进程，在这两个方法调用后，肯定是存在子进程了，这时会把live标志位置为1
 
             /* allow new processes to start */
             ngx_msleep(100);
@@ -326,9 +326,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle) // 如果是多进程方式启动�
 
         if (ngx_restart) {
             ngx_restart = 0;
-            ngx_start_worker_processes(cycle, ccf->worker_processes,
+            ngx_start_worker_processes(cycle, ccf->worker_processes, // 实际调用ngx_spawn_process 下面的 proc(cycle, data);
                                        NGX_PROCESS_RESPAWN);
-            ngx_start_cache_manager_processes(cycle, 0);
+            ngx_start_cache_manager_processes(cycle, 0); // 实际调用ngx_spawn_process 下面的 proc(cycle, data);
             live = 1;
         }
 
