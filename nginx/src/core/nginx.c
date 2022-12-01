@@ -473,7 +473,7 @@ nginx_main(int argc, char *const *argv)
     // 下面启动进程循环
     if (ngx_process == NGX_PROCESS_SINGLE) { //NGX_PROCESS_SINGLE — 单进程只存在于master_process模式模式的情况下。生命周期函数是ngx_single_process_cycle()。这个进程创建生命周期并且处理客户端连接。
         ngx_single_process_cycle(cycle); // 如果hginx.conf中配置为单进程工作模式，这时将会调用ngx_single_process_cycle方法进入单迸程工作模式。 //如果配置的是单进程工作模式，好像不会走到这里
-
+        // 上面函数会循环调用 ngx_process_events_and_timers
     } else { //一般都是走到这里，master方式
         ngx_master_process_cycle(cycle);
     }
