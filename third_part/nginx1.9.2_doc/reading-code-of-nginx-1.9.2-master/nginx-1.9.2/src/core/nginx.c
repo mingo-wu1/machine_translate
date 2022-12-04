@@ -400,7 +400,7 @@ socket监听状况，还是需要写到日志文件中去的。在nginx的main�
     }
 
 
-    ngx_os_status(cycle->log);
+    ngx_os_status(cycle->log); /*实际是写log*/
 
     ngx_cycle = cycle;
 
